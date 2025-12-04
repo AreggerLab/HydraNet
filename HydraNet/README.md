@@ -8,8 +8,11 @@ HydraNet is a hybrid deep-learning system for predicting Cas12a guide activity u
 
 ## Detailed Description
 This repository contains code to run HydraNet, a multi-headed deep learning system for predicting Cas12a guide RNA activity using both gRNA sequence information and pre-computed biophysical features. HydraNet is designed as a flexible modular pipeline that begins with careful guide labeling logic and ends with a fused multi-input neural model that learns patterns across several biological representations at once. The goal is to provide a robust framework for high-precision guide activity scoring across Cas12a nuclease variants.
+
 HydraNet itself is built using a multi-branch architecture inspired by the idea of multiple heads converging into a shared decision module. One head processes 1-mer sequence features using embeddings, convolutional filters, a bidirectional Long Short-Term Moemory (LSTM), and an attention layer. Two additional heads process 3-mer and 5-mer encodings using convolutional and pooling layers. A fourth head ingests tabular biological features. A dual gating mechanism enables cross modulation between the sequence heads and the tabular head, allowing each modality to emphasize or suppress information in the other. Residual dense blocks refine the fused representation before producing the final guide score.
+
 The source code for HydraNet is also provided and can be applied to train a new HydraNet model on other screening data sets containing activity outputs (e.g. log2 fold-change of guides in proliferation-based screens) across diverse sets of Cas12a guides. Training uses a custom weighted binary cross entropy loss with tunable penalties for each class. Hyperparameters are optimized through a Bayesian search. The best performing HydraNet model is automatically exported for inference on new guide feature datasets.
+
 
 ## Model Families
 
