@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# R
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+
+# Conda / micromamba
+.env/
+.mamba/
+.micromamba/
+*.lock
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+*.out
+*.err
+
+# TensorFlow SavedModel internals
+*/trained_models/*/variables/
+*/trained_models/*/assets/
+*/trained_models/*/saved_model.pb
