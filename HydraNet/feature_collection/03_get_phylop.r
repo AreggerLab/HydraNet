@@ -21,11 +21,6 @@ SEQINFO_HG38 <- readRDS("path/hg38_seqinfo.rds")
 message(paste0("🔹 Reading: ", basename(INPUT_CSV)))
 df <- read_csv(INPUT_CSV, show_col_types = FALSE, guess_max = 50000)
 
-# =================================================================================
-# FIX: The input file ALREADY has a 'chromosome' column from Script 1.
-# We REMOVE the redundant rename(chromosome = seqnames) call.
-# We KEEP the rename(cut_pos = cut_site) call, which is still needed.
-# =================================================================================
 message("🔹 Standardizing column names...")
 df <- df %>%
   # The 'chromosome' column already exists. No action needed for it.
@@ -40,9 +35,7 @@ df <- df %>%
 
 df$guide_idx <- seq_len(nrow(df))
 
-# =========================
-# The rest of the script is unchanged as its logic is sound.
-# =========================
+
 exonic_guides <- df %>% filter(!is.na(gene_strand))
 if (nrow(exonic_guides) > 0) {
   message("🔹 Computing PhyloP Guide+Flank (±4 bp around protospacer) ...")
