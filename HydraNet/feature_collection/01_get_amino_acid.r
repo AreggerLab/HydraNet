@@ -3,7 +3,7 @@
 # --- ARGS ---
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) != 2) {
-  stop("Usage: 01_get_amino_acid_duncan.r <input_guide_file> <output_csv>", call. = FALSE)
+  stop("Usage: 01_get_amino_acid.r <input_guide_file> <output_csv>", call. = FALSE)
 }
 INPUT_FILE <- args[1]
 OUTPUT_CSV <- args[2]
@@ -22,32 +22,44 @@ suppressPackageStartupMessages({
   library(stringr)
 })
 
-message("🐉🐉🐉 Loading EnsDb for Mus musculus (GRCm38/mm10) from AnnotationHub...")#====GRCh38 for human=====#
+message("🔹 Loading AnnotationHub and EnsDb v104...")
+# --- TRAVER ANNOTATIONHUB CACHE FIX ---
+AH_CACHE <- Sys.getenv(
+    "ANNOTATION_HUB_CACHE",
+    unset = "/path/AnnotationHub_cache"
+)
+
+dir.create(
+    AH_CACHE,
+    recursive = TRUE,
+    showWarnings = FALSE
+)
+
+AnnotationHub::setAnnotationHubOption(
+    "CACHE",
+    AH_CACHE
+)
+
+message(paste0("AnnotationHub cache: ", AH_CACHE))
+# --- END TRAVER ANNOTATIONHUB CACHE FIX ---
+
 ah <- AnnotationHub()
-
-qry <- query(ah, c("EnsDb", "Mus musculus", "GRCm38"))
-#qry <- query(ah, c("EnsDb", "Homo sapiens", "GRCh38"))#=====For Human====#
-if (length(qry) == 0) {
-  stop("No Mus musculus (GRCm38) EnsDb found in AnnotationHub. Try updating Bioconductor/AnnotationHub.", call. = FALSE)
-}
-
-if (!is.null(mcols(qry)$rdatadateadded)) {
-  qry <- qry[order(mcols(qry)$rdatadateadded, decreasing = TRUE)]
-}
-
-edb <- qry[[1]]
-message(sprintf("  -  EnsDb loaded: %s", mcols(qry)$title[1]))
-
-
+edb <- query(ah, c("EnsDb", "Homo sapiens", "GRCh38", "104"))[[1]]
+message("✅ EnsDb loaded.")
 
 # --- READ ---
-message(paste("Reading:", basename(INPUT_FILE)))
-
+message(paste("🔹 Reading:", basename(INPUT_FILE)))
+# The input is now the CSV from the previous step. It is comma-delimited.
 df <- read_csv(INPUT_FILE, show_col_types = FALSE)
 
+# ====================================================================================
+# The entire "CLEANUP" block from the original script has been REMOVED.
+# The input file is already cleaned by Cas12_CleanUp_Human.R.
+# We will just ensure the correct column names and types are used.
+# ====================================================================================
 
 # --- Prepare data for annotation ---
-message("🐉🐉🐉 Preparing data for annotation...")
+message("🔹 Preparing data for annotation...")
 df <- df %>%
   # Ensure the chromosome column is named correctly for GRanges
   rename(chromosome = seqnames) %>%
@@ -58,7 +70,7 @@ df <- df %>%
   )
 
 # --- ANNOTATE BY EXON OVERLAP USING cut_site ---
-message("🐉🐉🐉 Annotating guides with gene/exon information...")
+message("🔹 Annotating guides with gene/exon information...")
 # Filter out rows where cut_site is NA, as they cannot be used for annotation
 annot_df <- df %>%
   filter(!is.na(cut_site) & !is.na(chromosome)) %>%
@@ -71,11 +83,10 @@ if (nrow(annot_df) > 0) {
       original_row_idx = annot_df$original_row_idx
     )
     seqlevelsStyle(guides_gr) <- "Ensembl"
-    all_exons_gr <- exons(
-      edb,
-      columns = c("gene_id", "exon_idx", "gene_name", "exon_id")
-    )
 
+    all_exons_gr <- exons(edb,
+                          filter = GeneBiotypeFilter("protein_coding"),
+                          columns = c("gene_id", "exon_idx", "gene_name", "exon_id"))
     overlaps <- findOverlaps(guides_gr, all_exons_gr)
 
     if (length(overlaps) > 0) {
@@ -148,7 +159,7 @@ df <- df %>%
 exonic_df <- df %>% filter(!is.na(gene_id))
 
 # --- AA CONTEXT (canonical transcript) ---
-message("🐉🐉🐉 Projecting cut sites to protein space...")
+message("🔹 Projecting cut sites to protein space...")
 
 get_gene_info   <- memoise(function(gene_id) genes(edb, filter = GeneIdFilter(gene_id)))
 get_protein_seq <- memoise(function(tx_id)  proteins(edb, filter = TxIdFilter(tx_id))$protein_sequence[[1]])
@@ -159,21 +170,12 @@ process_guide <- function(guide) {
     gene_info <- get_gene_info(guide$gene_id_clean)
     if (length(gene_info) == 0) return(NULL)
 
-    # 1) Try canonical transcript
     tx_id <- gene_info$canonical_transcript[1]
-
-    # 2) If canonical is missing, fall back to first transcript with protein
-    if (is.na(tx_id)) {
-      prot_info <- proteins(edb, filter = GeneIdFilter(guide$gene_id_clean))
-      if (nrow(prot_info) == 0) return(NULL)
-      tx_id <- prot_info$tx_id[1]
-    }
-
+    if (is.na(tx_id)) return(NULL)
+    
     # Use cut_site from the input data
-    cut_gr <- GRanges(
-      seqnames = guide$chromosome,
-      ranges   = IRanges(guide$cut_site, guide$cut_site)
-    )
+    cut_gr <- GRanges(seqnames = guide$chromosome,
+                      ranges = IRanges(guide$cut_site, guide$cut_site))
     seqlevelsStyle(cut_gr) <- "Ensembl"
 
     tx_coord_all <- genomeToTranscript(cut_gr, edb)
@@ -201,14 +203,13 @@ process_guide <- function(guide) {
   }, error = function(e) NULL)
 }
 
-
 amino_acid_results <- if (nrow(exonic_df) > 0) {
   message(paste("🔹 Processing", nrow(exonic_df), "exonic guides..."))
   res <- purrr::map_dfr(split(exonic_df, seq_len(nrow(exonic_df))), process_guide)
   message(paste("✅ Amino-acid context found for", nrow(res), "guides."))
   res
 } else {
-  message("🐉🐉🐉 No exonic guides to process for AA features.")
+  message("✅ No exonic guides to process for AA features.")
   tibble(
     original_row_idx = integer(), protein_id = character(),
     aa_index = integer(), gene_strand = character(),
@@ -221,5 +222,5 @@ df_base <- df %>% select(-any_of(c("protein_id", "aa_index", "gene_strand", "aa_
 df_final <- df_base %>% left_join(amino_acid_results, by = "original_row_idx")
 
 # --- WRITE ---
-message(paste0("🐉🐉🐉 DONE: Writing ", OUTPUT_CSV))
+message(paste0("🎉 DONE: Writing ", OUTPUT_CSV))
 write_csv(df_final, OUTPUT_CSV, na = "NA")
