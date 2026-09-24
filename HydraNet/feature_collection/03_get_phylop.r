@@ -16,9 +16,9 @@ suppressPackageStartupMessages({
   library(purrr)
 })
 
-#SEQINFO_HG38 <- readRDS("/home/nahar2/Cas12_Human_GuideOptimization/hg38_seqinfo.rds")
+SEQINFO_HG38 <- readRDS("path/hg38_seqinfo.rds")
 
-message(paste0("🐉🐉🐉 Reading: ", basename(INPUT_CSV)))
+message(paste0("🔹 Reading: ", basename(INPUT_CSV)))
 df <- read_csv(INPUT_CSV, show_col_types = FALSE, guess_max = 50000)
 
 # =================================================================================
@@ -26,7 +26,7 @@ df <- read_csv(INPUT_CSV, show_col_types = FALSE, guess_max = 50000)
 # We REMOVE the redundant rename(chromosome = seqnames) call.
 # We KEEP the rename(cut_pos = cut_site) call, which is still needed.
 # =================================================================================
-message("🐉🐉🐉 Standardizing column names...")
+message("🔹 Standardizing column names...")
 df <- df %>%
   # The 'chromosome' column already exists. No action needed for it.
   # Rename 'cut_site' to 'cut_pos' for codon-level calculations.
@@ -40,10 +40,12 @@ df <- df %>%
 
 df$guide_idx <- seq_len(nrow(df))
 
-
+# =========================
+# The rest of the script is unchanged as its logic is sound.
+# =========================
 exonic_guides <- df %>% filter(!is.na(gene_strand))
 if (nrow(exonic_guides) > 0) {
-  message("🐉🐉🐉 Computing PhyloP Guide+Flank (±4 bp around protospacer) ...")
+  message("🔹 Computing PhyloP Guide+Flank (±4 bp around protospacer) ...")
 
   flank_start <- pmax(exonic_guides$protospacer_start - 4L, 1L)
   flank_end   <- exonic_guides$protospacer_end + 4L
@@ -54,7 +56,7 @@ if (nrow(exonic_guides) > 0) {
     guide_idx = exonic_guides$guide_idx
   )
   seqlevelsStyle(gr_flank) <- "UCSC"
-  #seqinfo(gr_flank) <- SEQINFO_HG38[seqlevels(gr_flank)]
+  seqinfo(gr_flank) <- SEQINFO_HG38[seqlevels(gr_flank)]
 
   bw_flank  <- suppressWarnings(import(PHYLOP_BW_FILE, which = gr_flank))
   overlaps  <- findOverlaps(gr_flank, bw_flank)
@@ -79,14 +81,14 @@ get_bulk_phyloP_scores <- function(guides_df, pos_vector, offset_vector = 0) {
     guide_idx = guides_df$guide_idx[valid]
   )
   seqlevelsStyle(gr) <- "UCSC"
-  #seqinfo(gr) <- SEQINFO_HG38[seqlevels(gr)]
+  seqinfo(gr) <- SEQINFO_HG38[seqlevels(gr)]
   scores_list <- suppressWarnings(import(PHYLOP_BW_FILE, which = gr, as = "NumericList"))
   mean_scores <- vapply(scores_list, mean, numeric(1), na.rm = TRUE)
   data.frame(guide_idx = gr$guide_idx, score = mean_scores)
 }
 
 if (nrow(exonic_guides) > 0) {
-  message("🐉🐉🐉 Computing codon-context PhyloP (Cut/Up/Down) ...")
+  message("🔹 Computing codon-context PhyloP (Cut/Up/Down) ...")
   get_codon_start <- function(cut) cut - ((cut - 1) %% 3)
   
   exonic_guides_with_pos <- exonic_guides %>% filter(!is.na(cut_pos))
@@ -108,7 +110,7 @@ if (nrow(exonic_guides) > 0) {
 }
 
 # NUCLEOTIDE-LEVEL (EXONIC)
-message("🐉🐉🐉 Computing nucleotide-level PhyloP (guide orientation) ...")
+message("🔹 Computing nucleotide-level PhyloP (guide orientation) ...")
 nuc_col_names <- paste0("PhyloP_Nuc_", 1:GUIDE_LENGTH)
 df[, nuc_col_names] <- NA_real_
 
@@ -120,7 +122,7 @@ if (nrow(exonic_guides) > 0) {
     strand    = exonic_guides$gene_strand
   )
   seqlevelsStyle(gr_nuc) <- "UCSC"
-  #seqinfo(gr_nuc) <- SEQINFO_HG38[seqlevels(gr_nuc)]
+  seqinfo(gr_nuc) <- SEQINFO_HG38[seqlevels(gr_nuc)]
   scores_list <- suppressWarnings(import(PHYLOP_BW_FILE, which = gr_nuc, as = "NumericList"))
   
   fix_len <- function(vec, len) {
@@ -145,4 +147,4 @@ df <- df %>%
 
 
 write_csv(df, OUTPUT_CSV, na = "NA")
-message(paste0("🐉🐉🐉 DONE: Wrote output to ", OUTPUT_CSV))
+message(paste0("🎉 DONE: Wrote output to ", OUTPUT_CSV))
