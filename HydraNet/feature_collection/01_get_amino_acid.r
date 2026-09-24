@@ -23,7 +23,7 @@ suppressPackageStartupMessages({
 })
 
 message("🔹 Loading AnnotationHub and EnsDb v104...")
-# --- TRAVER ANNOTATIONHUB CACHE FIX ---
+# ---  ANNOTATIONHUB CACHE  ---
 AH_CACHE <- Sys.getenv(
     "ANNOTATION_HUB_CACHE",
     unset = "/path/AnnotationHub_cache"
@@ -41,7 +41,7 @@ AnnotationHub::setAnnotationHubOption(
 )
 
 message(paste0("AnnotationHub cache: ", AH_CACHE))
-# --- END TRAVER ANNOTATIONHUB CACHE FIX ---
+# --- END ANNOTATIONHUB CACHE  ---
 
 ah <- AnnotationHub()
 edb <- query(ah, c("EnsDb", "Homo sapiens", "GRCh38", "104"))[[1]]
@@ -53,9 +53,7 @@ message(paste("🔹 Reading:", basename(INPUT_FILE)))
 df <- read_csv(INPUT_FILE, show_col_types = FALSE)
 
 # ====================================================================================
-# The entire "CLEANUP" block from the original script has been REMOVED.
-# The input file is already cleaned by Cas12_CleanUp_Human.R.
-# We will just ensure the correct column names and types are used.
+
 # ====================================================================================
 
 # --- Prepare data for annotation ---
